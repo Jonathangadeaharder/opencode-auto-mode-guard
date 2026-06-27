@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -488,6 +489,12 @@ def main() -> None:
         "  denied tools:",
         dict(Counter(row["proposedTool"] for row in dataset if row.get("semanticExpected") == "deny")),
     )
+
+    annotate_script = REPO_ROOT / "eval/annotate-block-reasons.py"
+    if annotate_script.is_file():
+        import subprocess
+
+        subprocess.run([sys.executable, str(annotate_script), str(DEFAULT_OUT)], check=True)
 
 
 if __name__ == "__main__":

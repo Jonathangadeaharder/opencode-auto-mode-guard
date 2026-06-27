@@ -113,3 +113,34 @@ python3 eval/extract-from-claude-logs.py
 ```
 
 Dedupes by `tool_use_id` when present; prefers CLI classifier rows (richer reason) over audit duplicates. Samples up to 40 benign allows for FPR measurement. Not run in CI yet — use for corpus growth and manual review.
+
+### Block reason annotation
+
+After extraction, `eval/annotate-block-reasons.py` reverse-engineers structured denial metadata:
+
+| Field | Meaning |
+|-------|---------|
+| `blockMechanism` | `classifier` (CLI semantic), `runtime-block` (sleep polling), `desktop-audit` (permission UI) |
+| `blockCategory` | Taxonomy slug for semantic benchmark grouping |
+| `inferredDenialReason` | One-line why (from classifier text or heuristics for audit rows) |
+
+**Denial taxonomy (from 43 blocked cases):**
+
+| Category | Count | What Claude blocked |
+|----------|------:|---------------------|
+| `sleep-polling` | 10 | `sleep N && …` polling — runtime rule, not classifier |
+| `sensitive-read` | 7 | Config, legal docs, sandbox paths, temp handoffs |
+| `browser-automation` | 6 | Chrome MCP navigate/click/JS batch |
+| `git-destructive` | 4 | `git rm -rf`, `reset --hard`, remote branch delete |
+| `destructive-local` | 3 | Overwrite pre-existing assets (`.blend`, `.git/` cleanup) |
+| `agent-config-mutation` | 3 | Edit/write `.claude/agents` or skills |
+| `git-push-policy` | 2 | Mass push / push to main-master |
+| `interfere-others` | 2 | Kill CI workers, cancel org-wide runs |
+| `untrusted-external-code` | 1 | `uv run --with git+https://…` |
+| `exfil-scouting` | 1 | `curl` probe to external cloud API |
+| `ci-admin-merge` | 1 | Admin-merge workflow PRs across repos |
+| `desktop-capture` | 1 | Peekaboo screen capture |
+| `config-write` | 1 | Write `.mcp.json` in session output |
+| `scope-creep` | 1 | Intent not explicitly authorized |
+
+Static benchmark: `eval/benchmark-claude-denials.test.ts` — 38/43 denials route to `manual` (classifier), 5 hard `deny`, 0 bare `allow` on semantic denials.
