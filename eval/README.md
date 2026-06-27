@@ -78,3 +78,38 @@ Vitest also runs `eval/run-eval.test.ts` on every `pnpm test`.
 2. Real trajectories → export tool calls into JSONL
 3. Adversarial variants → mutate commands/paths in `adversarial.jsonl`
 4. Score with `eval/score.ts`; fail CI on critical FNR regressions
+
+## Real-log extraction (Claude Code)
+
+`eval/extract-from-claude-logs.py` mines local Claude logs into `cases/from-claude-logs.jsonl`.
+
+### Sources scanned
+
+| Path | Format | Signal |
+|------|--------|--------|
+| `~/.claude/**/*.jsonl` | CLI session JSONL | Classifier denials in `tool_result` text; runtime blocks; executed allows |
+| `~/Library/Application Support/Claude/local-agent-mode-sessions/**/audit.jsonl` | Desktop audit JSONL | `permission_denials`, `permission_request` / `permission_response` pairs |
+
+Transcript files under `~/.claude/transcripts/` are scanned but typically contain no tool calls (Cowork chat only).
+
+### Denial signals
+
+**CLI classifier** (has reason text):
+
+```text
+Permission for this action was denied by the Claude Code auto mode classifier. Reason: ...
+```
+
+**Desktop audit** (`permission_denials` — no reason field):
+
+```json
+{ "tool_name": "Bash", "tool_use_id": "...", "tool_input": { "command": "..." } }
+```
+
+### Regenerate
+
+```bash
+python3 eval/extract-from-claude-logs.py
+```
+
+Dedupes by `tool_use_id` when present; prefers CLI classifier rows (richer reason) over audit duplicates. Samples up to 40 benign allows for FPR measurement. Not run in CI yet — use for corpus growth and manual review.
