@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs"
+import os from "node:os"
 import * as path from "node:path"
 import type { AutoModeGuardConfig } from "./config"
 import { matchesAnyPattern } from "./config"
@@ -390,6 +391,13 @@ function evaluateBash(args: Record<string, unknown>, config: AutoModeGuardConfig
     })
   }
 
+  if (isDefaultBranchGitPush(normalized)) {
+    return softManual("Git push to default branch (main/master) requires semantic review", likelyMutates(normalized), {
+      risk: "critical",
+      normalized,
+    })
+  }
+
   if (/(^|[;&|()\s])git\s+push\b/i.test(normalized) && isTrustedGitPush(normalized, config.environment.gitRemotes)) {
     return {
       decision: "allow",
@@ -582,7 +590,8 @@ export function extractPatchPaths(patchText: string): string[] {
 }
 
 async function resolveInsideRoot(root: string, inputPath: string) {
-  const absolute = path.resolve(root, inputPath)
+  const expanded = expandUserPath(inputPath.trim())
+  const absolute = path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(root, expanded)
   const rootReal = await safeRealpath(root)
   const targetReal = await realpathForExistingTarget(absolute)
   const relativePath = toPosix(path.relative(rootReal, targetReal))
@@ -712,6 +721,26 @@ function isTrustedGitPush(normalized: string, trustedRemotes: string[]): boolean
   if (!remote) return false
 
   return matchesAnyPattern(trustedRemotes, remote)
+}
+
+function isDefaultBranchGitPush(normalized: string): boolean {
+  const patterns = [
+    /\bgit\s+push\b(?:\s+[^\s]+)?\s+(main|master)\b/i,
+    /\bgit\s+push\b[^;&|]*\s+[^\s]+:(main|master)\b/i,
+    /\bHEAD:(main|master)\b/i,
+    /\bgit\s+push\b[^;&|]*\s+(main|master)\s*$/i,
+  ]
+  return patterns.some((pattern) => pattern.test(normalized))
+}
+
+function expandUserPath(inputPath: string): string {
+  if (inputPath === "~") {
+    return os.homedir()
+  }
+  if (inputPath.startsWith("~/")) {
+    return path.join(os.homedir(), inputPath.slice(2))
+  }
+  return inputPath
 }
 
 function isTrustedDomain(target: string, trustedDomains: string[]): boolean {

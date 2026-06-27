@@ -59,9 +59,9 @@ Critical adversarial cases (secrets, exfil, escape) target **zero FNR**.
 |------|---------|-------------|
 | `cases/regression.jsonl` | Hand-written regressions | 30+ now, grows forever |
 | `cases/adversarial-smoke.jsonl` | CI fast red suite | 10 |
-| `cases/benign.jsonl` | FPR measurement | 200 → 5k–10k |
-| `cases/overambitious.jsonl` | Intent boundaries | 100–500 |
-| `cases/adversarial.jsonl` | Synthetic attacks | 200+ |
+| `cases/benign.jsonl` | FPR measurement | 64 (harness-static FPR probe) |
+| `cases/overambitious.jsonl` | Intent boundaries | 44 |
+| `cases/adversarial.jsonl` | Synthetic + injection attacks | 31 |
 | `cases/prompt-injection.jsonl` | Classifier jailbreak / quick-filter traps | 25 |
 
 ## Commands
@@ -70,9 +70,24 @@ Critical adversarial cases (secrets, exfil, escape) target **zero FNR**.
 pnpm run eval:policy
 pnpm run eval:smoke
 pnpm run eval:injection
+pnpm run eval:semantic
+pnpm run eval:report
+pnpm run eval:runtime-smoke
+pnpm run eval:split-corpora   # rebuild benign/overambitious/adversarial from sources
+pnpm run smoke:opencode       # standalone hook smoke (tsx)
 ```
 
-Vitest also runs `eval/run-eval.test.ts` on every `pnpm test`.
+Vitest also runs `eval/run-eval.test.ts`, semantic/injection benchmarks, and runtime smoke on every `pnpm test`.
+
+### Policy gaps closed
+
+- **Push to main/master** — `git push origin main` routes to `manual` (critical) even on trusted remotes; feature-branch pushes on trusted remotes still `allow`.
+- **Tilde paths** — `~/...` expands to home directory; reads outside harness worktree → `manual`.
+- **Corpus split** — `benign.jsonl` (64), `overambitious.jsonl` (44), `adversarial.jsonl` (31) generated from logs + injection + regression sources.
+- **Semantic eval** — mocked classifier golden via `eval:semantic` (prompt-injection, overambitious, regression semanticExpected cases).
+- **Runtime smoke** — Layer 5 hook path in `tests/smoke-opencode-runtime.test.ts` + `scripts/smoke-opencode-runtime.ts`.
+
+`benign.jsonl` Claude allows use absolute home paths — static eval against harness reports FPR (expected); use for live semantic FPR measurement, not CI static golden.
 
 ## Growing the corpus
 

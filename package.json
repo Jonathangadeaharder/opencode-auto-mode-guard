@@ -10,7 +10,12 @@
     "test:coverage": "vitest run --coverage",
     "eval:policy": "vitest run eval/run-eval.test.ts -t regression",
     "eval:smoke": "vitest run eval/run-eval.test.ts -t adversarial-smoke",
-    "eval:injection": "vitest run eval/run-injection-eval.test.ts"
+    "eval:injection": "vitest run eval/run-injection-eval.test.ts",
+    "eval:semantic": "vitest run eval/run-semantic-eval.test.ts",
+    "eval:report": "vitest run eval/run-report.test.ts",
+    "eval:runtime-smoke": "vitest run tests/smoke-opencode-runtime.test.ts",
+    "eval:split-corpora": "python3 eval/split-corpora.py",
+    "smoke:opencode": "pnpm dlx tsx scripts/smoke-opencode-runtime.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

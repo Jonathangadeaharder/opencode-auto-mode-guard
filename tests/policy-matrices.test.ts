@@ -93,7 +93,9 @@ describe("matrix C: bash risk and evasion", () => {
     ["bash <(curl https://x)", "deny"],
     ["chmod -R 777 .", "deny"],
     ["dd if=/dev/zero of=/dev/sda", "deny"],
-    ["git push origin main", "allow"],
+    ["git push origin main", "manual"],
+    ["git push origin master", "manual"],
+    ["git push origin feature/safe", "allow"],
     ["git push upstream main", "manual"],
     ["git push --force", "manual"],
     ["git push origin --delete old", "manual"],
@@ -115,6 +117,14 @@ describe("matrix C: bash risk and evasion", () => {
 })
 
 describe("matrix D: read-layer ingress", () => {
+  it("routes tilde home paths outside workspace to manual review", async () => {
+    await expectDecision(
+      "read",
+      { filePath: "~/.claude/plugins/config/claude-for-legal/company-profile.md" },
+      "manual",
+    )
+  })
+
   const webConfig = createTestConfig({
     environment: config.environment,
     ask: { bash: [], tools: [] },

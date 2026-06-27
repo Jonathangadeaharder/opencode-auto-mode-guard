@@ -90,6 +90,20 @@ describe("policy", () => {
     expect(verdict.denyTier).toBe("hard")
   })
 
+  it("requires semantic review for push to main on trusted remote", async () => {
+    const verdict = await evaluateToolCall({
+      tool: "bash",
+      args: { command: "git push origin main" },
+      directory: harnessRoot,
+      worktree: harnessRoot,
+      config,
+    })
+
+    expect(verdict.decision).toBe("manual")
+    expect(verdict.risk).toBe("critical")
+    expect(requiresClassifier(verdict)).toBe(true)
+  })
+
   it("allows trusted git push remotes", async () => {
     const verdict = await evaluateToolCall({
       tool: "bash",
@@ -113,6 +127,19 @@ describe("policy", () => {
 
     expect(verdict.decision).toBe("manual")
     expect(requiresClassifier(verdict)).toBe(true)
+  })
+
+  it("routes tilde paths outside workspace to semantic review", async () => {
+    const verdict = await evaluateToolCall({
+      tool: "read",
+      args: { filePath: "~/.claude/plugins/config/claude-for-legal/company-profile.md" },
+      directory: harnessRoot,
+      worktree: harnessRoot,
+      config,
+    })
+
+    expect(verdict.decision).toBe("manual")
+    expect(verdict.reviewLayer).toBe("read")
   })
 
   it("allows safe bash commands", async () => {
