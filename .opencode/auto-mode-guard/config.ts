@@ -16,6 +16,13 @@ export interface AutoModeGuardConfig {
     consecutiveBlocks: number
     totalBlocks: number
   }
+  classifierModel?: string
+}
+
+export interface ResolvedClassifierModel {
+  providerID: string
+  modelID: string
+  source: "env" | "guard-config" | "small_model" | "main_model"
 }
 
 const DEFAULT_CONFIG: AutoModeGuardConfig = {
@@ -37,6 +44,69 @@ const CONFIG_CANDIDATES = [
   ".opencode/auto-mode-guard.json",
   ".opencode/auto-mode-guard/config.json",
 ]
+
+const OPENCODE_CONFIG_CANDIDATES = ["opencode.json", ".opencode/opencode.json"]
+
+export async function loadMergedOpenCodeConfig(root: string): Promise<Record<string, unknown>> {
+  let merged: Record<string, unknown> = {}
+
+  const globalPath = path.join(readHomeDir(), ".config/opencode/opencode.json")
+  const globalConfig = await readJsonFile(globalPath)
+  if (globalConfig) {
+    merged = { ...merged, ...globalConfig }
+  }
+
+  for (const relative of OPENCODE_CONFIG_CANDIDATES) {
+    const fromFile = await readJsonFile(path.join(root, relative))
+    if (fromFile) {
+      merged = { ...merged, ...fromFile }
+    }
+  }
+
+  return merged
+}
+
+export function parseModelRef(raw: string | undefined): { providerID: string; modelID: string } | undefined {
+  if (!raw?.trim()) return undefined
+
+  const [providerID, ...modelParts] = raw.trim().split("/")
+  const modelID = modelParts.join("/")
+
+  if (!providerID || !modelID) {
+    return undefined
+  }
+
+  return { providerID, modelID }
+}
+
+export async function resolveClassifierModel(
+  root: string,
+  guardConfig: AutoModeGuardConfig,
+): Promise<ResolvedClassifierModel | undefined> {
+  const envModel = parseModelRef(readEnv("OPENCODE_AUTO_MODE_CLASSIFIER_MODEL"))
+  if (envModel) {
+    return { ...envModel, source: "env" }
+  }
+
+  const guardModel = parseModelRef(guardConfig.classifierModel)
+  if (guardModel) {
+    return { ...guardModel, source: "guard-config" }
+  }
+
+  const opencode = await loadMergedOpenCodeConfig(root)
+
+  const smallModel = parseModelRef(readString(opencode.small_model))
+  if (smallModel) {
+    return { ...smallModel, source: "small_model" }
+  }
+
+  const mainModel = parseModelRef(readString(opencode.model))
+  if (mainModel) {
+    return { ...mainModel, source: "main_model" }
+  }
+
+  return undefined
+}
 
 export async function loadAutoModeGuardConfig(root: string): Promise<AutoModeGuardConfig> {
   const merged: AutoModeGuardConfig = structuredClone(DEFAULT_CONFIG)
@@ -113,6 +183,10 @@ function mergeConfig(target: AutoModeGuardConfig, source: Record<string, unknown
       target.escalation.totalBlocks = esc.totalBlocks
     }
   }
+
+  if (typeof source.classifierModel === "string" && source.classifierModel.trim()) {
+    target.classifierModel = source.classifierModel.trim()
+  }
 }
 
 function mergeEnvTrust(config: AutoModeGuardConfig) {
@@ -133,6 +207,14 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
   } catch {
     return undefined
   }
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+function readHomeDir(): string {
+  return (globalThis as any)?.process?.env?.HOME ?? (globalThis as any)?.process?.env?.USERPROFILE ?? ""
 }
 
 function readEnv(key: string): string | undefined {

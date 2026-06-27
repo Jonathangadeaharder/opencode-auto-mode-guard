@@ -2,7 +2,15 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { loadAutoModeGuardConfig, matchesAnyPattern, matchesPattern } from "../.opencode/auto-mode-guard/config"
+import {
+  loadAutoModeGuardConfig,
+  loadMergedOpenCodeConfig,
+  matchesAnyPattern,
+  matchesPattern,
+  parseModelRef,
+  resolveClassifierModel,
+} from "../.opencode/auto-mode-guard/config"
+import { createTestConfig } from "./helpers/config"
 
 describe("config", () => {
   const tempDirs: string[] = []
@@ -55,10 +63,85 @@ describe("config", () => {
     expect(config.ask.bash).toContain("npm publish *")
     expect(config.escalation.consecutiveBlocks).toBe(5)
   })
+
+  it("parses provider/model refs", () => {
+    expect(parseModelRef("anthropic/claude-haiku-4-5")).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-haiku-4-5",
+    })
+    expect(parseModelRef("openrouter/mistralai/mistral-small")).toEqual({
+      providerID: "openrouter",
+      modelID: "mistralai/mistral-small",
+    })
+  })
+
+  it("resolves classifier model with env override", async () => {
+    const root = await createTempDir(tempDirs)
+    await writeOpenCodeConfig(root, {
+      small_model: "anthropic/claude-haiku-4-5",
+      model: "anthropic/claude-sonnet-4-5",
+    })
+
+    const previous = process.env.OPENCODE_AUTO_MODE_CLASSIFIER_MODEL
+    process.env.OPENCODE_AUTO_MODE_CLASSIFIER_MODEL = "openai/gpt-4.1-mini"
+
+    try {
+      const resolved = await resolveClassifierModel(root, createTestConfig())
+      expect(resolved?.source).toBe("env")
+      expect(resolved?.modelID).toBe("gpt-4.1-mini")
+    } finally {
+      if (previous === undefined) {
+        delete process.env.OPENCODE_AUTO_MODE_CLASSIFIER_MODEL
+      } else {
+        process.env.OPENCODE_AUTO_MODE_CLASSIFIER_MODEL = previous
+      }
+    }
+  })
+
+  it("defaults classifier model to opencode small_model", async () => {
+    const root = await createTempDir(tempDirs)
+    await writeOpenCodeConfig(root, {
+      small_model: "anthropic/claude-haiku-4-5",
+      model: "anthropic/claude-sonnet-4-5",
+    })
+
+    const resolved = await resolveClassifierModel(root, createTestConfig())
+    expect(resolved?.source).toBe("small_model")
+    expect(resolved?.modelID).toBe("claude-haiku-4-5")
+  })
+
+  it("falls back to guard classifierModel before opencode small_model", async () => {
+    const root = await createTempDir(tempDirs)
+    await writeOpenCodeConfig(root, {
+      small_model: "anthropic/claude-haiku-4-5",
+    })
+
+    const resolved = await resolveClassifierModel(root, createTestConfig({ classifierModel: "openai/gpt-4.1-mini" }))
+    expect(resolved?.source).toBe("guard-config")
+    expect(resolved?.modelID).toBe("gpt-4.1-mini")
+  })
+
+  it("loads merged opencode config with project overrides", async () => {
+    const root = await createTempDir(tempDirs)
+    await writeFile(path.join(root, "opencode.json"), JSON.stringify({ small_model: "anthropic/claude-haiku-4-5" }))
+    await mkdir(path.join(root, ".opencode"), { recursive: true })
+    await writeFile(
+      path.join(root, ".opencode/opencode.json"),
+      JSON.stringify({ model: "anthropic/claude-sonnet-4-5" }),
+    )
+
+    const merged = await loadMergedOpenCodeConfig(root)
+    expect(merged.small_model).toBe("anthropic/claude-haiku-4-5")
+    expect(merged.model).toBe("anthropic/claude-sonnet-4-5")
+  })
 })
 
 async function createTempDir(registry: string[]) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "auto-mode-guard-"))
   registry.push(dir)
   return dir
+}
+
+async function writeOpenCodeConfig(root: string, config: Record<string, unknown>) {
+  await writeFile(path.join(root, "opencode.json"), JSON.stringify(config))
 }

@@ -1,6 +1,4 @@
-import { promises as fs } from "node:fs"
-import * as path from "node:path"
-import { matchesPattern } from "./config"
+import { loadMergedOpenCodeConfig, matchesPattern } from "./config"
 
 export type OpenCodePermissionAction = "allow" | "ask" | "deny"
 
@@ -12,19 +10,10 @@ export interface OpenCodePermissionVerdict {
 
 type PermissionRuleMap = Record<string, string | Record<string, string>>
 
-const CONFIG_CANDIDATES = ["opencode.json", ".opencode/opencode.json"]
-
 export async function loadOpenCodePermissionRules(root: string): Promise<PermissionRuleMap | undefined> {
-  for (const relative of CONFIG_CANDIDATES) {
-    const filePath = path.join(root, relative)
-    try {
-      const parsed = JSON.parse(await fs.readFile(filePath, "utf8"))
-      if (parsed?.permission && typeof parsed.permission === "object") {
-        return parsed.permission as PermissionRuleMap
-      }
-    } catch {
-      // try next candidate
-    }
+  const merged = await loadMergedOpenCodeConfig(root)
+  if (merged.permission && typeof merged.permission === "object") {
+    return merged.permission as PermissionRuleMap
   }
   return undefined
 }

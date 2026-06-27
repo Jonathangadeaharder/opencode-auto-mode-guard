@@ -17,5 +17,6 @@ export function createTestConfig(overrides: Partial<AutoModeGuardConfig> = {}): 
       totalBlocks: 20,
       ...overrides.escalation,
     },
+    classifierModel: overrides.classifierModel,
   }
 }

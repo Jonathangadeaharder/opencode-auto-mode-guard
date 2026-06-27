@@ -5,7 +5,7 @@ import {
   formatSemanticBlock,
   type SemanticClassifierVerdict,
 } from "../auto-mode-guard/classifier"
-import { loadAutoModeGuardConfig } from "../auto-mode-guard/config"
+import { loadAutoModeGuardConfig, resolveClassifierModel } from "../auto-mode-guard/config"
 import {
   evaluateOpenCodePermission,
   loadOpenCodePermissionRules,
@@ -27,6 +27,7 @@ const SERVICE = "auto-mode-guard"
 export const AutoModeGuard: Plugin = async ({ client, $, directory, worktree }) => {
   const root = worktree ?? directory
   const config = await loadAutoModeGuardConfig(root)
+  const classifierModel = await resolveClassifierModel(root, config)
   const openCodePermissionRules = await loadOpenCodePermissionRules(root)
   const pendingBySession = new Map<string, PendingValidationState>()
   const runningValidation = new Set<string>()
@@ -35,6 +36,9 @@ export const AutoModeGuard: Plugin = async ({ client, $, directory, worktree }) 
     client,
     directory,
     worktree,
+    model: classifierModel
+      ? { providerID: classifierModel.providerID, modelID: classifierModel.modelID }
+      : undefined,
     log: (level, message, extra) => log(client, level, message, extra),
   })
 
@@ -54,6 +58,10 @@ export const AutoModeGuard: Plugin = async ({ client, $, directory, worktree }) 
     trustedGitRemotes: config.environment.gitRemotes.length,
     trustedDomains: config.environment.domains.length,
     openCodePermissionRules: Boolean(openCodePermissionRules),
+    classifierModel: classifierModel
+      ? `${classifierModel.providerID}/${classifierModel.modelID}`
+      : undefined,
+    classifierModelSource: classifierModel?.source,
   })
 
   return {

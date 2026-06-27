@@ -84,7 +84,7 @@ const CLASSIFIER_SCHEMA = {
 export function createSemanticClassifier(options: SemanticClassifierOptions) {
   const classifierSessions = new Set<string>()
   const cache = new Map<string, CachedVerdict>()
-  const resolvedModel = options.model ?? parseModelRef(readEnv("OPENCODE_AUTO_MODE_CLASSIFIER_MODEL"))
+  const resolvedModel = options.model
   const maxTranscriptMessages = options.maxTranscriptMessages ?? DEFAULT_MAX_TRANSCRIPT_MESSAGES
   const maxTranscriptChars = options.maxTranscriptChars ?? DEFAULT_MAX_TRANSCRIPT_CHARS
   const cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
@@ -816,23 +816,6 @@ function extractSessionID(value: unknown): string | undefined {
   ]
 
   return candidates.find((candidate) => typeof candidate === "string" && candidate.length > 0)
-}
-
-function parseModelRef(raw: string | undefined): { providerID: string; modelID: string } | undefined {
-  if (!raw?.trim()) return undefined
-
-  const [providerID, ...modelParts] = raw.trim().split("/")
-  const modelID = modelParts.join("/")
-
-  if (!providerID || !modelID) {
-    return undefined
-  }
-
-  return { providerID, modelID }
-}
-
-function readEnv(key: string): string | undefined {
-  return (globalThis as any)?.process?.env?.[key]
 }
 
 function isRiskLevel(value: string): value is RiskLevel {

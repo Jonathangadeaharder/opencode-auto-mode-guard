@@ -3,6 +3,7 @@
     "gitRemotes": ["origin", "github.com/your-org/*"],
     "domains": ["api.internal.example.com", "*.trusted.example.com"]
   },
+  "classifierModel": "anthropic/claude-haiku-4-5",
   "ask": {
     "bash": ["docker compose up *"],
     "tools": ["webfetch", "websearch"]
