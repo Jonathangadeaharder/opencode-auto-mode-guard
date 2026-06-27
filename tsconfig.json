@@ -12,5 +12,5 @@
       "@opencode-ai/plugin": ["./types/@opencode-ai/plugin/index.d.ts"]
     }
   },
-  "include": [".opencode/**/*.ts", "types/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+  "include": [".opencode/**/*.ts", "types/**/*.ts", "tests/**/*.ts", "eval/**/*.ts", "vitest.config.ts"]
 }

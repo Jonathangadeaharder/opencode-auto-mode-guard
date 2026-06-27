@@ -95,6 +95,8 @@ const SAFE_BASH = [
   /^\s*cat\s+[^;&|]*$/i,
   /^\s*(head|tail|wc)\s+[^;&|]*$/i,
   /^\s*(pnpm|npm|yarn|bun)\s+(run\s+)?(test|typecheck|lint|check)(\b|\s)/i,
+  /^\s*(cargo|go)\s+test(\b|\s)/i,
+  /^\s*pytest(\b|\s)/i,
   /^\s*(pnpm\s+exec|npx|bunx)\s+tsc\s+--noEmit(\b|\s)/i,
   /^\s*(pnpm\s+exec|npx|bunx)\s+biome\s+check(\b|\s)/i,
   /^\s*(pnpm\s+exec|npx|bunx)\s+eslint(\b|\s)/i,
@@ -378,6 +380,16 @@ function evaluateBash(args: Record<string, unknown>, config: AutoModeGuardConfig
     })
   }
 
+  if (
+    /(^|[;&|()\s])git\s+push\b/i.test(normalized) &&
+    /(--delete|--force|\s-[f]\b)/i.test(normalized)
+  ) {
+    return softManual("Git push with destructive or force flags requires semantic review", likelyMutates(normalized), {
+      risk: "high",
+      normalized,
+    })
+  }
+
   if (/(^|[;&|()\s])git\s+push\b/i.test(normalized) && isTrustedGitPush(normalized, config.environment.gitRemotes)) {
     return {
       decision: "allow",
@@ -544,7 +556,29 @@ function extractCandidatePaths(args: Record<string, unknown>): string[] {
     }
   }
 
+  const patchText = args.patchText ?? args.patch
+  if (typeof patchText === "string" && patchText.trim()) {
+    result.push(...extractPatchPaths(patchText))
+  }
+
   return [...new Set(result)]
+}
+
+export function extractPatchPaths(patchText: string): string[] {
+  const paths: string[] = []
+
+  for (const match of patchText.matchAll(/^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s+(.+)$/gim)) {
+    paths.push(match[1].trim())
+  }
+
+  for (const match of patchText.matchAll(/^(?:---|\+\+\+)\s+(?:a\/|b\/)?(.+)$/gim)) {
+    const candidate = match[1].trim()
+    if (candidate !== "/dev/null" && candidate !== "dev/null") {
+      paths.push(candidate)
+    }
+  }
+
+  return [...new Set(paths)]
 }
 
 async function resolveInsideRoot(root: string, inputPath: string) {

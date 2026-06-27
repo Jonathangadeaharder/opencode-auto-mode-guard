@@ -8,7 +8,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "eval/**/*.test.ts"],
     environment: "node",
     coverage: {
       provider: "v8",

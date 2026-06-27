@@ -7,7 +7,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "eval:policy": "vitest run eval/run-eval.test.ts -t regression",
+    "eval:smoke": "vitest run eval/run-eval.test.ts -t adversarial-smoke"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
