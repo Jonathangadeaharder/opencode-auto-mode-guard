@@ -1,4 +1,5 @@
 import type { PolicyVerdict, RiskLevel } from "./policy"
+import { requiresFullClassifierReview } from "./injection-heuristics"
 
 export type ClassifierDecision = "allow" | "deny"
 
@@ -140,7 +141,12 @@ export function createSemanticClassifier(options: SemanticClassifierOptions) {
           transcript,
         })
 
-        if (!quickReview) {
+        if (!quickReview && !requiresFullClassifierReview({
+          policyVerdict: input.policyVerdict,
+          tool: input.tool,
+          sanitizedArgs,
+          transcript,
+        })) {
           const allowed: SemanticClassifierVerdict = {
             permissionDecision: "allow",
             riskLevel: "low",
@@ -151,6 +157,15 @@ export function createSemanticClassifier(options: SemanticClassifierOptions) {
           cache.set(cacheKey, { expiresAt: now + cacheTtlMs, verdict: allowed })
           pruneCache(cache)
           return allowed
+        }
+
+        if (!quickReview) {
+          await options.log?.("debug", "Quick filter skipped full review; policy/injection heuristics require full review", {
+            sessionID: input.sessionID,
+            tool: input.tool,
+            policyDecision: input.policyVerdict.decision,
+            policyRisk: input.policyVerdict.risk,
+          })
         }
 
         const prompt = buildClassifierPrompt({

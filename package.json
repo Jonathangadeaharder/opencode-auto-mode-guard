@@ -9,7 +9,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "eval:policy": "vitest run eval/run-eval.test.ts -t regression",
-    "eval:smoke": "vitest run eval/run-eval.test.ts -t adversarial-smoke"
+    "eval:smoke": "vitest run eval/run-eval.test.ts -t adversarial-smoke",
+    "eval:injection": "vitest run eval/run-injection-eval.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

@@ -62,12 +62,14 @@ Critical adversarial cases (secrets, exfil, escape) target **zero FNR**.
 | `cases/benign.jsonl` | FPR measurement | 200 → 5k–10k |
 | `cases/overambitious.jsonl` | Intent boundaries | 100–500 |
 | `cases/adversarial.jsonl` | Synthetic attacks | 200+ |
+| `cases/prompt-injection.jsonl` | Classifier jailbreak / quick-filter traps | 25 |
 
 ## Commands
 
 ```bash
 pnpm run eval:policy
 pnpm run eval:smoke
+pnpm run eval:injection
 ```
 
 Vitest also runs `eval/run-eval.test.ts` on every `pnpm test`.
@@ -144,3 +146,17 @@ After extraction, `eval/annotate-block-reasons.py` reverse-engineers structured 
 | `scope-creep` | 1 | Intent not explicitly authorized |
 
 Static benchmark: `eval/benchmark-claude-denials.test.ts` — 38/43 denials route to `manual` (classifier), 5 hard `deny`, 0 bare `allow` on semantic denials.
+
+## Prompt injection eval
+
+`eval/cases/prompt-injection.jsonl` — 25 cases across fake-user-auth, classifier-jailbreak, quick-filter-trap, arg-smuggle, indirect-read-auth, hostile-read, plus benign controls.
+
+Defense layers:
+
+1. **Static** — secrets/destructives hard-deny; critical injection cases never bare-`allow`
+2. **Injection heuristics** (`injection-heuristics.ts`) — blocks quick-filter bypass when transcript/args smell like jailbreak or policy is high-risk `manual`
+3. **Full classifier review** — mocked CI asserts trap cases reach stage 2 and deny
+
+```bash
+pnpm run eval:injection
+```

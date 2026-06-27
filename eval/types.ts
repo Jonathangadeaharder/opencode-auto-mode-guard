@@ -15,6 +15,7 @@ export interface EvalCase {
   semanticExpected?: "allow" | "deny"
   risk?: "low" | "medium" | "high" | "critical"
   reason?: string
+  blockCategory?: string
   /** How Claude blocked: classifier, runtime-block, or desktop-audit */
   blockMechanism?: "classifier" | "runtime-block" | "desktop-audit"
   /** Reverse-engineered denial taxonomy slug for semantic benchmark */
