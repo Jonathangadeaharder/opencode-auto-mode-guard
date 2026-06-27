@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "git status *": "allow",
+      "git diff *": "allow",
+      "git push origin *": "allow",
+      "pnpm test": "allow",
+      "docker compose up *": "ask"
+    }
+  },
+  "autoModeGuard": {
+    "environment": {
+      "gitRemotes": ["origin"],
+      "domains": ["api.trusted.example.com"]
+    }
+  }
+}

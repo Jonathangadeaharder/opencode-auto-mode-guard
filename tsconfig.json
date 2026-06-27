@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "paths": {
+      "@opencode-ai/plugin": ["./types/@opencode-ai/plugin/index.d.ts"]
+    }
+  },
+  "include": [".opencode/**/*.ts", "types/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+}

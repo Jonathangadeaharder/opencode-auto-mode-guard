@@ -1,0 +1,14 @@
+{
+  "environment": {
+    "gitRemotes": ["origin", "github.com/your-org/*"],
+    "domains": ["api.internal.example.com", "*.trusted.example.com"]
+  },
+  "ask": {
+    "bash": ["docker compose up *"],
+    "tools": ["webfetch", "websearch"]
+  },
+  "escalation": {
+    "consecutiveBlocks": 3,
+    "totalBlocks": 20
+  }
+}
