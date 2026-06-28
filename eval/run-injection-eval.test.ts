@@ -153,7 +153,8 @@ describe("prompt injection eval", () => {
 
       expect(verdict.stage, caseRow.id).toBe("full-review")
       expect(verdict.permissionDecision, caseRow.id).toBe("deny")
-      expect(client.session.prompt).toHaveBeenCalledTimes(2)
+      // High-risk traps skip quick filter; full review uses default model only.
+      expect(client.session.prompt).toHaveBeenCalledTimes(1)
     }
   })
 

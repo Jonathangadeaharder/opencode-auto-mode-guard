@@ -18,5 +18,7 @@ export function createTestConfig(overrides: Partial<AutoModeGuardConfig> = {}): 
       ...overrides.escalation,
     },
     classifierModel: overrides.classifierModel,
+    classifierQuickFilterModel: overrides.classifierQuickFilterModel,
+    classifierFullReviewModel: overrides.classifierFullReviewModel,
   }
 }

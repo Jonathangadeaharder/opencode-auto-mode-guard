@@ -9,6 +9,7 @@ import {
   matchesPattern,
   parseModelRef,
   resolveClassifierModel,
+  resolveClassifierStack,
 } from "../.opencode/auto-mode-guard/config"
 import { createTestConfig } from "./helpers/config"
 
@@ -75,7 +76,33 @@ describe("config", () => {
     })
   })
 
-  it("resolves classifier model with env override", async () => {
+  it("resolves classifier stack with quick filter on small_model and full review on main model", async () => {
+    const root = await createTempDir(tempDirs)
+    await writeOpenCodeConfig(root, {
+      small_model: "anthropic/claude-haiku-4-5",
+      model: "anthropic/claude-sonnet-4-5",
+    })
+
+    const stack = await resolveClassifierStack(root, createTestConfig())
+    expect(stack?.quickFilter.source).toBe("small_model")
+    expect(stack?.quickFilter.modelID).toBe("claude-haiku-4-5")
+    expect(stack?.fullReview.source).toBe("main_model")
+    expect(stack?.fullReview.modelID).toBe("claude-sonnet-4-5")
+  })
+
+  it("resolveClassifierModel returns full-review tier", async () => {
+    const root = await createTempDir(tempDirs)
+    await writeOpenCodeConfig(root, {
+      small_model: "anthropic/claude-haiku-4-5",
+      model: "anthropic/claude-sonnet-4-5",
+    })
+
+    const resolved = await resolveClassifierModel(root, createTestConfig())
+    expect(resolved?.source).toBe("main_model")
+    expect(resolved?.modelID).toBe("claude-sonnet-4-5")
+  })
+
+  it("resolves full-review model with env override", async () => {
     const root = await createTempDir(tempDirs)
     await writeOpenCodeConfig(root, {
       small_model: "anthropic/claude-haiku-4-5",
@@ -98,27 +125,17 @@ describe("config", () => {
     }
   })
 
-  it("defaults classifier model to opencode small_model", async () => {
+  it("falls back to guard classifierModel for full review before opencode small_model", async () => {
     const root = await createTempDir(tempDirs)
     await writeOpenCodeConfig(root, {
       small_model: "anthropic/claude-haiku-4-5",
       model: "anthropic/claude-sonnet-4-5",
     })
 
-    const resolved = await resolveClassifierModel(root, createTestConfig())
-    expect(resolved?.source).toBe("small_model")
-    expect(resolved?.modelID).toBe("claude-haiku-4-5")
-  })
-
-  it("falls back to guard classifierModel before opencode small_model", async () => {
-    const root = await createTempDir(tempDirs)
-    await writeOpenCodeConfig(root, {
-      small_model: "anthropic/claude-haiku-4-5",
-    })
-
-    const resolved = await resolveClassifierModel(root, createTestConfig({ classifierModel: "openai/gpt-4.1-mini" }))
-    expect(resolved?.source).toBe("guard-config")
-    expect(resolved?.modelID).toBe("gpt-4.1-mini")
+    const stack = await resolveClassifierStack(root, createTestConfig({ classifierModel: "openai/gpt-4.1-mini" }))
+    expect(stack?.quickFilter.source).toBe("small_model")
+    expect(stack?.fullReview.source).toBe("guard-config")
+    expect(stack?.fullReview.modelID).toBe("gpt-4.1-mini")
   })
 
   it("loads merged opencode config with project overrides", async () => {

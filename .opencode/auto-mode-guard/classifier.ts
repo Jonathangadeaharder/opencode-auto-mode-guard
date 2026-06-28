@@ -23,9 +23,14 @@ export interface SemanticClassifierOptions {
   client: any
   directory: string
   worktree?: string
+  /** @deprecated Use models.quickFilter / models.fullReview */
   model?: {
     providerID: string
     modelID: string
+  }
+  models?: {
+    quickFilter?: { providerID: string; modelID: string }
+    fullReview?: { providerID: string; modelID: string }
   }
   maxTranscriptMessages?: number
   maxTranscriptChars?: number
@@ -85,7 +90,8 @@ const CLASSIFIER_SCHEMA = {
 export function createSemanticClassifier(options: SemanticClassifierOptions) {
   const classifierSessions = new Set<string>()
   const cache = new Map<string, CachedVerdict>()
-  const resolvedModel = options.model
+  const quickFilterModel = options.models?.quickFilter ?? options.model
+  const fullReviewModel = options.models?.fullReview ?? options.model
   const maxTranscriptMessages = options.maxTranscriptMessages ?? DEFAULT_MAX_TRANSCRIPT_MESSAGES
   const maxTranscriptChars = options.maxTranscriptChars ?? DEFAULT_MAX_TRANSCRIPT_CHARS
   const cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
@@ -130,23 +136,45 @@ export function createSemanticClassifier(options: SemanticClassifierOptions) {
       }
 
       try {
-        const quickReview = await runQuickFilter({
-          client: options.client,
-          classifierSessions,
-          model: resolvedModel,
-          directory: options.worktree ?? options.directory,
-          tool: input.tool,
-          policyVerdict: input.policyVerdict,
-          sanitizedArgs,
-          transcript,
-        })
+        const mustUseFullReview =
+          input.policyVerdict.risk === "critical" ||
+          input.policyVerdict.risk === "high" ||
+          requiresFullClassifierReview({
+            policyVerdict: input.policyVerdict,
+            tool: input.tool,
+            sanitizedArgs,
+            transcript,
+          })
 
-        if (!quickReview && !requiresFullClassifierReview({
-          policyVerdict: input.policyVerdict,
-          tool: input.tool,
-          sanitizedArgs,
-          transcript,
-        })) {
+        let quickReview = true
+        if (!mustUseFullReview) {
+          quickReview = await runQuickFilter({
+            client: options.client,
+            classifierSessions,
+            model: quickFilterModel,
+            directory: options.worktree ?? options.directory,
+            tool: input.tool,
+            policyVerdict: input.policyVerdict,
+            sanitizedArgs,
+            transcript,
+          })
+        } else {
+          await options.log?.("debug", "Skipping quick filter; routing directly to full review", {
+            sessionID: input.sessionID,
+            tool: input.tool,
+            policyRisk: input.policyVerdict.risk,
+          })
+        }
+
+        if (
+          !quickReview &&
+          !requiresFullClassifierReview({
+            policyVerdict: input.policyVerdict,
+            tool: input.tool,
+            sanitizedArgs,
+            transcript,
+          })
+        ) {
           const allowed: SemanticClassifierVerdict = {
             permissionDecision: "allow",
             riskLevel: "low",
@@ -181,7 +209,7 @@ export function createSemanticClassifier(options: SemanticClassifierOptions) {
           client: options.client,
           classifierSessions,
           prompt,
-          model: resolvedModel,
+          model: fullReviewModel,
           directory: options.worktree ?? options.directory,
         })
         const verdict = {

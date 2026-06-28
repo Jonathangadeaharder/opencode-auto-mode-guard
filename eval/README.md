@@ -79,6 +79,19 @@ pnpm run smoke:opencode       # standalone hook smoke (tsx)
 
 Vitest also runs `eval/run-eval.test.ts`, semantic/injection benchmarks, and runtime smoke on every `pnpm test`.
 
+### Classifier model tiers
+
+Most tool calls never reach the LLM: static policy `allow`/`deny` handles them. When semantic review is needed:
+
+| Stage | Model | When |
+|-------|-------|------|
+| **Quick filter** | OpenCode `small_model` (or `classifierQuickFilterModel`) | Medium/low `manual` only — fast yes/no |
+| **Full review** | OpenCode `model` / default (or `classifierFullReviewModel`) | High/critical risk, injection heuristics, or quick filter says yes |
+
+High/critical policy risk **skips** the quick filter entirely (no small model on those paths).
+
+Env overrides: `OPENCODE_AUTO_MODE_QUICK_FILTER_MODEL`, `OPENCODE_AUTO_MODE_FULL_REVIEW_MODEL`, legacy `OPENCODE_AUTO_MODE_CLASSIFIER_MODEL` → full review only.
+
 ### Policy gaps closed
 
 - **Push to main/master** — `git push origin main` routes to `manual` (critical) even on trusted remotes; feature-branch pushes on trusted remotes still `allow`.

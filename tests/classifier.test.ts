@@ -59,7 +59,7 @@ describe("classifier contract", () => {
       args: { command: "git push upstream feature/test" },
       policyVerdict: {
         decision: "manual",
-        risk: "high",
+        risk: "medium",
         mutates: true,
         reason: "Untrusted push",
         reviewLayer: "action",
@@ -177,10 +177,10 @@ describe("classifier contract", () => {
     const verdict = await classifier.classify({
       sessionID: "user-session-malformed",
       tool: "bash",
-      args: { command: "git push upstream main" },
+      args: { command: "git push upstream feature/auth" },
       policyVerdict: {
         decision: "manual",
-        risk: "high",
+        risk: "medium",
         mutates: true,
         reason: "Untrusted push",
         reviewLayer: "action",
@@ -213,7 +213,7 @@ describe("classifier contract", () => {
     const verdict = await classifier.classify({
       sessionID: "user-session-probably-no",
       tool: "bash",
-      args: { command: "git push origin main" },
+      args: { command: "git push upstream feature/auth" },
       policyVerdict: {
         decision: "manual",
         risk: "medium",
@@ -309,7 +309,7 @@ describe("classifier contract", () => {
     const verdict = await classifier.classify({
       sessionID: "user-session-invalid-decision",
       tool: "bash",
-      args: { command: "git push upstream main" },
+      args: { command: "git push upstream feature/auth" },
       policyVerdict: {
         decision: "manual",
         risk: "high",
@@ -384,6 +384,88 @@ describe("classifier contract", () => {
     expect(promptText).not.toContain("sk_test_abcdefghijklmnopqrstuvwxyz123456")
   })
 
+  it("skips quick filter for critical policy risk and uses one full-review call", async () => {
+    const client = createMockClient({
+      messages: [userMessage("Push to origin.")],
+      structuredOutputs: [
+        {
+          permissionDecision: "deny",
+          riskLevel: "critical",
+          reason: "Push to main was not explicitly requested.",
+        },
+      ],
+    })
+
+    const classifier = createSemanticClassifier({
+      client,
+      directory: harnessRoot,
+      worktree: harnessRoot,
+      models: {
+        quickFilter: { providerID: "local", modelID: "small" },
+        fullReview: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+      },
+    })
+
+    const verdict = await classifier.classify({
+      sessionID: "user-session-critical",
+      tool: "bash",
+      args: { command: "git push origin main" },
+      policyVerdict: {
+        decision: "manual",
+        risk: "critical",
+        mutates: true,
+        reason: "Push to default branch",
+        reviewLayer: "action",
+      },
+    })
+
+    expect(verdict.permissionDecision).toBe("deny")
+    expect(verdict.stage).toBe("full-review")
+    expect(client.session.prompt).toHaveBeenCalledTimes(1)
+    expect(client.promptBodies[0]?.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-5" })
+  })
+
+  it("uses quick-filter model for medium-risk manual and full-review model when escalated", async () => {
+    const client = createMockClient({
+      messages: [userMessage("Refactor auth only.")],
+      promptTexts: ["yes"],
+      structuredOutputs: [
+        {
+          permissionDecision: "deny",
+          riskLevel: "high",
+          reason: "Git push was not explicitly requested.",
+        },
+      ],
+    })
+
+    const classifier = createSemanticClassifier({
+      client,
+      directory: harnessRoot,
+      worktree: harnessRoot,
+      models: {
+        quickFilter: { providerID: "local", modelID: "small-fast" },
+        fullReview: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+      },
+    })
+
+    await classifier.classify({
+      sessionID: "user-session-tiered",
+      tool: "bash",
+      args: { command: "git push upstream feature/test" },
+      policyVerdict: {
+        decision: "manual",
+        risk: "medium",
+        mutates: true,
+        reason: "Untrusted push",
+        reviewLayer: "action",
+      },
+    })
+
+    expect(client.session.prompt).toHaveBeenCalledTimes(2)
+    expect(client.promptBodies[0]?.model).toEqual({ providerID: "local", modelID: "small-fast" })
+    expect(client.promptBodies[1]?.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-5" })
+  })
+
   it("does not quick-filter allow when quick filter says no but injection heuristics require full review", async () => {
     const client = createMockClient({
       messages: [
@@ -421,7 +503,7 @@ describe("classifier contract", () => {
 
     expect(verdict.stage).toBe("full-review")
     expect(verdict.permissionDecision).toBe("deny")
-    expect(client.session.prompt).toHaveBeenCalledTimes(2)
+    expect(client.session.prompt).toHaveBeenCalledTimes(1)
   })
 
   it("disables workspace tools in classifier session prompts", async () => {

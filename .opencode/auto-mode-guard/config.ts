@@ -17,12 +17,29 @@ export interface AutoModeGuardConfig {
     totalBlocks: number
   }
   classifierModel?: string
+  /** Fast yes/no filter model (defaults to OpenCode small_model). */
+  classifierQuickFilterModel?: string
+  /** Deep semantic review model (defaults to OpenCode model / main). */
+  classifierFullReviewModel?: string
 }
 
 export interface ResolvedClassifierModel {
   providerID: string
   modelID: string
-  source: "env" | "guard-config" | "small_model" | "main_model"
+  source:
+    | "env-quick-filter"
+    | "env-full-review"
+    | "env"
+    | "guard-quick-filter"
+    | "guard-full-review"
+    | "guard-config"
+    | "small_model"
+    | "main_model"
+}
+
+export interface ResolvedClassifierStack {
+  quickFilter: ResolvedClassifierModel
+  fullReview: ResolvedClassifierModel
 }
 
 const DEFAULT_CONFIG: AutoModeGuardConfig = {
@@ -79,21 +96,47 @@ export function parseModelRef(raw: string | undefined): { providerID: string; mo
   return { providerID, modelID }
 }
 
+export async function resolveClassifierStack(
+  root: string,
+  guardConfig: AutoModeGuardConfig,
+): Promise<ResolvedClassifierStack | undefined> {
+  const opencode = await loadMergedOpenCodeConfig(root)
+  const quickFilter = resolveQuickFilterModel(guardConfig, opencode)
+  const fullReview = resolveFullReviewModel(guardConfig, opencode)
+
+  if (!quickFilter && !fullReview) {
+    return undefined
+  }
+
+  const fallback = quickFilter ?? fullReview!
+  return {
+    quickFilter: quickFilter ?? fallback,
+    fullReview: fullReview ?? fallback,
+  }
+}
+
+/** @deprecated Prefer resolveClassifierStack — returns the deep full-review model. */
 export async function resolveClassifierModel(
   root: string,
   guardConfig: AutoModeGuardConfig,
 ): Promise<ResolvedClassifierModel | undefined> {
-  const envModel = parseModelRef(readEnv("OPENCODE_AUTO_MODE_CLASSIFIER_MODEL"))
+  const stack = await resolveClassifierStack(root, guardConfig)
+  return stack?.fullReview
+}
+
+function resolveQuickFilterModel(
+  guardConfig: AutoModeGuardConfig,
+  opencode: Record<string, unknown>,
+): ResolvedClassifierModel | undefined {
+  const envModel = parseModelRef(readEnv("OPENCODE_AUTO_MODE_QUICK_FILTER_MODEL"))
   if (envModel) {
-    return { ...envModel, source: "env" }
+    return { ...envModel, source: "env-quick-filter" }
   }
 
-  const guardModel = parseModelRef(guardConfig.classifierModel)
+  const guardModel = parseModelRef(guardConfig.classifierQuickFilterModel)
   if (guardModel) {
-    return { ...guardModel, source: "guard-config" }
+    return { ...guardModel, source: "guard-quick-filter" }
   }
-
-  const opencode = await loadMergedOpenCodeConfig(root)
 
   const smallModel = parseModelRef(readString(opencode.small_model))
   if (smallModel) {
@@ -103,6 +146,43 @@ export async function resolveClassifierModel(
   const mainModel = parseModelRef(readString(opencode.model))
   if (mainModel) {
     return { ...mainModel, source: "main_model" }
+  }
+
+  return undefined
+}
+
+function resolveFullReviewModel(
+  guardConfig: AutoModeGuardConfig,
+  opencode: Record<string, unknown>,
+): ResolvedClassifierModel | undefined {
+  const envFull = parseModelRef(readEnv("OPENCODE_AUTO_MODE_FULL_REVIEW_MODEL"))
+  if (envFull) {
+    return { ...envFull, source: "env-full-review" }
+  }
+
+  const envLegacy = parseModelRef(readEnv("OPENCODE_AUTO_MODE_CLASSIFIER_MODEL"))
+  if (envLegacy) {
+    return { ...envLegacy, source: "env" }
+  }
+
+  const guardFull = parseModelRef(guardConfig.classifierFullReviewModel)
+  if (guardFull) {
+    return { ...guardFull, source: "guard-full-review" }
+  }
+
+  const guardLegacy = parseModelRef(guardConfig.classifierModel)
+  if (guardLegacy) {
+    return { ...guardLegacy, source: "guard-config" }
+  }
+
+  const mainModel = parseModelRef(readString(opencode.model))
+  if (mainModel) {
+    return { ...mainModel, source: "main_model" }
+  }
+
+  const smallModel = parseModelRef(readString(opencode.small_model))
+  if (smallModel) {
+    return { ...smallModel, source: "small_model" }
   }
 
   return undefined
@@ -186,6 +266,14 @@ function mergeConfig(target: AutoModeGuardConfig, source: Record<string, unknown
 
   if (typeof source.classifierModel === "string" && source.classifierModel.trim()) {
     target.classifierModel = source.classifierModel.trim()
+  }
+
+  if (typeof source.classifierQuickFilterModel === "string" && source.classifierQuickFilterModel.trim()) {
+    target.classifierQuickFilterModel = source.classifierQuickFilterModel.trim()
+  }
+
+  if (typeof source.classifierFullReviewModel === "string" && source.classifierFullReviewModel.trim()) {
+    target.classifierFullReviewModel = source.classifierFullReviewModel.trim()
   }
 }
 
