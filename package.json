@@ -1,0 +1,29 @@
+{
+  "name": "opencode-auto-mode-guard",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "pretest": "python3 eval/split-corpora.py",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "eval:ci": "vitest run eval/run-eval.test.ts -t regression eval/run-eval.test.ts -t adversarial-smoke eval/run-injection-eval.test.ts tests/smoke-opencode-runtime.test.ts",
+    "eval:nightly": "vitest run eval/run-semantic-eval.test.ts eval/benchmark-claude-denials.test.ts",
+    "eval:policy": "vitest run eval/run-eval.test.ts -t regression",
+    "eval:smoke": "vitest run eval/run-eval.test.ts -t adversarial-smoke",
+    "eval:injection": "vitest run eval/run-injection-eval.test.ts",
+    "eval:semantic": "vitest run eval/run-semantic-eval.test.ts",
+    "eval:report": "vitest run eval/run-report.test.ts",
+    "eval:runtime-smoke": "vitest run tests/smoke-opencode-runtime.test.ts",
+    "eval:split-corpora": "python3 eval/split-corpora.py",
+    "smoke:opencode": "pnpm dlx tsx scripts/smoke-opencode-runtime.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

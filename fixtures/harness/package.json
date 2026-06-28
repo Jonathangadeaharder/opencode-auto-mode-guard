@@ -1,0 +1,8 @@
+{
+  "name": "auto-mode-guard-harness",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

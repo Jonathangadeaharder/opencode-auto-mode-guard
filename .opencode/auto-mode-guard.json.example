@@ -1,0 +1,15 @@
+{
+  "environment": {
+    "gitRemotes": ["origin", "github.com/your-org/*"],
+    "domains": ["api.internal.example.com", "*.trusted.example.com"]
+  },
+  "classifierModel": "ollama/granite4.1-guardian:8b",
+  "ask": {
+    "bash": ["docker compose up *"],
+    "tools": ["webfetch", "websearch"]
+  },
+  "escalation": {
+    "consecutiveBlocks": 3,
+    "totalBlocks": 20
+  }
+}
