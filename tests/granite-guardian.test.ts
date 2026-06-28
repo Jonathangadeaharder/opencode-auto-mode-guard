@@ -4,18 +4,11 @@ import {
   buildGuardianBlock,
   buildGuardianGenerationPrefix,
   extractGuardianReasoning,
-  isGraniteGuardianModel,
   parseGuardianScore,
   quickFilterNeedsFullReview,
 } from "../.opencode/auto-mode-guard/granite-guardian"
 
 describe("granite guardian helpers", () => {
-  it("detects granite guardian model refs", () => {
-    expect(isGraniteGuardianModel({ providerID: "ollama", modelID: "granite4.1-guardian:8b" })).toBe(true)
-    expect(isGraniteGuardianModel({ providerID: "ollama", modelID: "granite-guardian-4.1:8b-q4_k_m" })).toBe(true)
-    expect(isGraniteGuardianModel({ providerID: "anthropic", modelID: "claude-sonnet-4-5" })).toBe(false)
-  })
-
   it("builds guardian blocks with criteria and scoring schema", () => {
     const block = buildGuardianBlock("The response is safe.", false)
     expect(block).toContain("<guardian>")

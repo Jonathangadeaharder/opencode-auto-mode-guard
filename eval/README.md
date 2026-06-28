@@ -59,14 +59,17 @@ Critical adversarial cases (secrets, exfil, escape) target **zero FNR**.
 |------|---------|-------------|
 | `cases/regression.jsonl` | Hand-written regressions | 30+ now, grows forever |
 | `cases/adversarial-smoke.jsonl` | CI fast red suite | 10 |
-| `cases/benign.jsonl` | FPR measurement | 64 (harness-static FPR probe) |
-| `cases/overambitious.jsonl` | Intent boundaries | 44 |
-| `cases/adversarial.jsonl` | Synthetic + injection attacks | 31 |
-| `cases/prompt-injection.jsonl` | Classifier jailbreak / quick-filter traps | 25 |
+| `cases/prompt-injection.jsonl` | Classifier jailbreak / quick-filter traps (source) | 25 |
+| `cases/benign.jsonl` | FPR measurement (**generated**) | ~64 |
+| `cases/overambitious.jsonl` | Intent boundaries (**generated**) | ~44 |
+| `cases/adversarial.jsonl` | Synthetic + injection attacks (**generated**) | ~31 |
 
 ## Commands
 
 ```bash
+pnpm test                    # pretest regenerates derived corpora, then full suite
+pnpm run eval:ci             # PR gate: regression + smoke + injection + runtime smoke
+pnpm run eval:nightly        # semantic golden + Claude denial benchmark
 pnpm run eval:policy
 pnpm run eval:smoke
 pnpm run eval:injection
@@ -74,25 +77,25 @@ pnpm run eval:semantic
 pnpm run eval:report
 pnpm run eval:runtime-smoke
 pnpm run eval:split-corpora   # rebuild benign/overambitious/adversarial from sources
-pnpm run smoke:opencode       # standalone hook smoke (tsx)
+pnpm run smoke:opencode
 ```
 
-Vitest also runs `eval/run-eval.test.ts`, semantic/injection benchmarks, and runtime smoke on every `pnpm test`.
+Vitest runs unit, eval, and runtime smoke on every `pnpm test`. Derived corpora (`benign.jsonl`, `overambitious.jsonl`, `adversarial.jsonl`) are **generated** by `pretest` / `eval:split-corpora` — not hand-edited.
 
-### Classifier model tiers
+### Classifier (Granite Guardian)
 
-Most tool calls never reach the LLM: static policy `allow`/`deny` handles them. When semantic review is needed:
+Most tool calls never reach the LLM: static policy `allow`/`deny` handles them. Semantic review uses one local model:
 
-| Stage | Model | When |
-|-------|-------|------|
-| **Quick filter** | [Granite Guardian 4.1](https://www.ibm.com/granite/docs/models/guardian) via Ollama (`ollama/granite4.1-guardian:8b`) — no-think `<score>` | Medium/low `manual` only |
-| **Full review** | Same Granite Guardian — think mode for high/critical, BYOC authorization criteria | High/critical risk, injection heuristics, or quick filter says yes |
+| Stage | Mode | When |
+|-------|------|------|
+| **Quick filter** | no-think `<score>` | Medium/low `manual` only |
+| **Full review** | think + BYOC authorization criteria | High/critical, injection heuristics, or quick filter yes |
 
-Default: `ollama pull granite4.1-guardian:8b` (local). Classifier does **not** use the agent's OpenCode `model` / `small_model` unless you override.
+Default: `ollama pull granite4.1-guardian:8b` → `classifierModel` in guard config.
 
-High/critical policy risk **skips** the quick filter entirely.
+Override: `OPENCODE_AUTO_MODE_CLASSIFIER_MODEL` or `classifierModel` in `.opencode/auto-mode-guard.json`.
 
-Env overrides: `OPENCODE_AUTO_MODE_QUICK_FILTER_MODEL`, `OPENCODE_AUTO_MODE_FULL_REVIEW_MODEL`, legacy `OPENCODE_AUTO_MODE_CLASSIFIER_MODEL` → full review only. Guard config: `classifierQuickFilterModel`, `classifierFullReviewModel`.
+High/critical policy risk **skips** the quick filter.
 
 ### Policy gaps closed
 

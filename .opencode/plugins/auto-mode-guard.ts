@@ -5,7 +5,7 @@ import {
   formatSemanticBlock,
   type SemanticClassifierVerdict,
 } from "../auto-mode-guard/classifier"
-import { loadAutoModeGuardConfig, resolveClassifierStack } from "../auto-mode-guard/config"
+import { loadAutoModeGuardConfig, resolveClassifierModel } from "../auto-mode-guard/config"
 import {
   evaluateOpenCodePermission,
   loadOpenCodePermissionRules,
@@ -27,7 +27,7 @@ const SERVICE = "auto-mode-guard"
 export const AutoModeGuard: Plugin = async ({ client, $, directory, worktree }) => {
   const root = worktree ?? directory
   const config = await loadAutoModeGuardConfig(root)
-  const classifierStack = await resolveClassifierStack(root, config)
+  const classifierModel = await resolveClassifierModel(root, config)
   const openCodePermissionRules = await loadOpenCodePermissionRules(root)
   const pendingBySession = new Map<string, PendingValidationState>()
   const runningValidation = new Set<string>()
@@ -36,18 +36,10 @@ export const AutoModeGuard: Plugin = async ({ client, $, directory, worktree }) 
     client,
     directory,
     worktree,
-    models: classifierStack
-      ? {
-          quickFilter: {
-            providerID: classifierStack.quickFilter.providerID,
-            modelID: classifierStack.quickFilter.modelID,
-          },
-          fullReview: {
-            providerID: classifierStack.fullReview.providerID,
-            modelID: classifierStack.fullReview.modelID,
-          },
-        }
-      : undefined,
+    model: {
+      providerID: classifierModel.providerID,
+      modelID: classifierModel.modelID,
+    },
     log: (level, message, extra) => log(client, level, message, extra),
   })
 
@@ -67,14 +59,8 @@ export const AutoModeGuard: Plugin = async ({ client, $, directory, worktree }) 
     trustedGitRemotes: config.environment.gitRemotes.length,
     trustedDomains: config.environment.domains.length,
     openCodePermissionRules: Boolean(openCodePermissionRules),
-    classifierQuickFilterModel: classifierStack
-      ? `${classifierStack.quickFilter.providerID}/${classifierStack.quickFilter.modelID}`
-      : undefined,
-    classifierQuickFilterSource: classifierStack?.quickFilter.source,
-    classifierFullReviewModel: classifierStack
-      ? `${classifierStack.fullReview.providerID}/${classifierStack.fullReview.modelID}`
-      : undefined,
-    classifierFullReviewSource: classifierStack?.fullReview.source,
+    classifierModel: `${classifierModel.providerID}/${classifierModel.modelID}`,
+    classifierModelSource: classifierModel.source,
   })
 
   return {

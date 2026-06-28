@@ -19,31 +19,14 @@ export interface AutoModeGuardConfig {
     consecutiveBlocks: number
     totalBlocks: number
   }
+  /** Granite Guardian model for semantic review (`ollama/granite4.1-guardian:8b` by default). */
   classifierModel?: string
-  /** Fast yes/no filter model (defaults to local Granite Guardian via Ollama). */
-  classifierQuickFilterModel?: string
-  /** Deep semantic review model (defaults to local Granite Guardian via Ollama). */
-  classifierFullReviewModel?: string
 }
 
 export interface ResolvedClassifierModel {
   providerID: string
   modelID: string
-  source:
-    | "env-quick-filter"
-    | "env-full-review"
-    | "env"
-    | "guard-quick-filter"
-    | "guard-full-review"
-    | "guard-config"
-    | "granite_guardian_default"
-    | "small_model"
-    | "main_model"
-}
-
-export interface ResolvedClassifierStack {
-  quickFilter: ResolvedClassifierModel
-  fullReview: ResolvedClassifierModel
+  source: "env" | "guard-config" | "granite_guardian_default"
 }
 
 const DEFAULT_CONFIG: AutoModeGuardConfig = {
@@ -100,46 +83,18 @@ export function parseModelRef(raw: string | undefined): { providerID: string; mo
   return { providerID, modelID }
 }
 
-export async function resolveClassifierStack(
-  root: string,
-  guardConfig: AutoModeGuardConfig,
-): Promise<ResolvedClassifierStack | undefined> {
-  const opencode = await loadMergedOpenCodeConfig(root)
-  const quickFilter = resolveQuickFilterModel(guardConfig, opencode)
-  const fullReview = resolveFullReviewModel(guardConfig, opencode)
-
-  if (!quickFilter && !fullReview) {
-    return undefined
-  }
-
-  const fallback = quickFilter ?? fullReview!
-  return {
-    quickFilter: quickFilter ?? fallback,
-    fullReview: fullReview ?? fallback,
-  }
-}
-
-/** @deprecated Prefer resolveClassifierStack — returns the deep full-review model. */
 export async function resolveClassifierModel(
-  root: string,
+  _root: string,
   guardConfig: AutoModeGuardConfig,
-): Promise<ResolvedClassifierModel | undefined> {
-  const stack = await resolveClassifierStack(root, guardConfig)
-  return stack?.fullReview
-}
-
-function resolveQuickFilterModel(
-  guardConfig: AutoModeGuardConfig,
-  opencode: Record<string, unknown>,
-): ResolvedClassifierModel | undefined {
-  const envModel = parseModelRef(readEnv("OPENCODE_AUTO_MODE_QUICK_FILTER_MODEL"))
+): Promise<ResolvedClassifierModel> {
+  const envModel = parseModelRef(readEnv("OPENCODE_AUTO_MODE_CLASSIFIER_MODEL"))
   if (envModel) {
-    return { ...envModel, source: "env-quick-filter" }
+    return { ...envModel, source: "env" }
   }
 
-  const guardModel = parseModelRef(guardConfig.classifierQuickFilterModel)
+  const guardModel = parseModelRef(guardConfig.classifierModel)
   if (guardModel) {
-    return { ...guardModel, source: "guard-quick-filter" }
+    return { ...guardModel, source: "guard-config" }
   }
 
   const graniteDefault = parseModelRef(DEFAULT_GRANITE_GUARDIAN_MODEL)
@@ -147,59 +102,7 @@ function resolveQuickFilterModel(
     return { ...graniteDefault, source: "granite_guardian_default" }
   }
 
-  const smallModel = parseModelRef(readString(opencode.small_model))
-  if (smallModel) {
-    return { ...smallModel, source: "small_model" }
-  }
-
-  const mainModel = parseModelRef(readString(opencode.model))
-  if (mainModel) {
-    return { ...mainModel, source: "main_model" }
-  }
-
-  return undefined
-}
-
-function resolveFullReviewModel(
-  guardConfig: AutoModeGuardConfig,
-  opencode: Record<string, unknown>,
-): ResolvedClassifierModel | undefined {
-  const envFull = parseModelRef(readEnv("OPENCODE_AUTO_MODE_FULL_REVIEW_MODEL"))
-  if (envFull) {
-    return { ...envFull, source: "env-full-review" }
-  }
-
-  const envLegacy = parseModelRef(readEnv("OPENCODE_AUTO_MODE_CLASSIFIER_MODEL"))
-  if (envLegacy) {
-    return { ...envLegacy, source: "env" }
-  }
-
-  const guardFull = parseModelRef(guardConfig.classifierFullReviewModel)
-  if (guardFull) {
-    return { ...guardFull, source: "guard-full-review" }
-  }
-
-  const guardLegacy = parseModelRef(guardConfig.classifierModel)
-  if (guardLegacy) {
-    return { ...guardLegacy, source: "guard-config" }
-  }
-
-  const graniteDefault = parseModelRef(DEFAULT_GRANITE_GUARDIAN_MODEL)
-  if (graniteDefault) {
-    return { ...graniteDefault, source: "granite_guardian_default" }
-  }
-
-  const mainModel = parseModelRef(readString(opencode.model))
-  if (mainModel) {
-    return { ...mainModel, source: "main_model" }
-  }
-
-  const smallModel = parseModelRef(readString(opencode.small_model))
-  if (smallModel) {
-    return { ...smallModel, source: "small_model" }
-  }
-
-  return undefined
+  throw new Error("Could not resolve a classifier model.")
 }
 
 export async function loadAutoModeGuardConfig(root: string): Promise<AutoModeGuardConfig> {
@@ -281,14 +184,6 @@ function mergeConfig(target: AutoModeGuardConfig, source: Record<string, unknown
   if (typeof source.classifierModel === "string" && source.classifierModel.trim()) {
     target.classifierModel = source.classifierModel.trim()
   }
-
-  if (typeof source.classifierQuickFilterModel === "string" && source.classifierQuickFilterModel.trim()) {
-    target.classifierQuickFilterModel = source.classifierQuickFilterModel.trim()
-  }
-
-  if (typeof source.classifierFullReviewModel === "string" && source.classifierFullReviewModel.trim()) {
-    target.classifierFullReviewModel = source.classifierFullReviewModel.trim()
-  }
 }
 
 function mergeEnvTrust(config: AutoModeGuardConfig) {
@@ -309,10 +204,6 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
   } catch {
     return undefined
   }
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined
 }
 
 function readHomeDir(): string {

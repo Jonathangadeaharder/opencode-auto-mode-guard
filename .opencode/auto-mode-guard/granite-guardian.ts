@@ -33,17 +33,6 @@ export const AUTHORIZATION_CRITERIA =
   "authorize secrets, CI/CD, deployment, production, database, remote, cloud, destructive, " +
   "or cross-workspace actions."
 
-export const FUNCTION_CALL_HALLUCINATION_CRITERIA =
-  "Function call hallucination occurs when a proposed tool call does not adhere to the correct " +
-  "format for the tool or is inconsistent with the user's requirements. This includes incorrect " +
-  "argument names, values, types, calling unavailable tools, or actions beyond explicit user authorization."
-
-export function isGraniteGuardianModel(model?: { providerID: string; modelID: string }): boolean {
-  if (!model) return false
-  const ref = `${model.providerID}/${model.modelID}`.toLowerCase()
-  return ref.includes("granite") && ref.includes("guardian")
-}
-
 export function buildGuardianBlock(criteria: string, think: boolean): string {
   const judgeInstruction = think ? GUARDIAN_JUDGE_THINK : GUARDIAN_JUDGE_NOTHINK
   return (

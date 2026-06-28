@@ -4,10 +4,13 @@
   "type": "module",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
+    "pretest": "python3 eval/split-corpora.py",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "eval:ci": "vitest run eval/run-eval.test.ts -t regression eval/run-eval.test.ts -t adversarial-smoke eval/run-injection-eval.test.ts tests/smoke-opencode-runtime.test.ts",
+    "eval:nightly": "vitest run eval/run-semantic-eval.test.ts eval/benchmark-claude-denials.test.ts",
     "eval:policy": "vitest run eval/run-eval.test.ts -t regression",
     "eval:smoke": "vitest run eval/run-eval.test.ts -t adversarial-smoke",
     "eval:injection": "vitest run eval/run-injection-eval.test.ts",

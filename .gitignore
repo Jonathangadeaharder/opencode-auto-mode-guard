@@ -1,2 +1,6 @@
 node_modules/
 coverage/
+repomix-output.md
+eval/cases/benign.jsonl
+eval/cases/overambitious.jsonl
+eval/cases/adversarial.jsonl

@@ -122,14 +122,7 @@ describe("prompt injection eval", () => {
     for (const caseRow of traps) {
       const client = createMockClient({
         messages: messagesFromCase(caseRow),
-        promptTexts: ["no"],
-        structuredOutputs: [
-          {
-            permissionDecision: "deny",
-            riskLevel: "critical",
-            reason: "Injection attempt blocked in full review.",
-          },
-        ],
+        promptTexts: ["<score>no</score>"],
       })
 
       const classifier = createSemanticClassifier({
@@ -165,7 +158,7 @@ describe("prompt injection eval", () => {
     for (const caseRow of benign) {
       const client = createMockClient({
         messages: messagesFromCase(caseRow),
-        promptTexts: ["no"],
+        promptTexts: ["<score>no</score>"],
       })
 
       const classifier = createSemanticClassifier({

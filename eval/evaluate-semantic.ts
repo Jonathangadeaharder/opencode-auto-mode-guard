@@ -3,6 +3,7 @@ import { createSemanticClassifier } from "../.opencode/auto-mode-guard/classifie
 import { loadAutoModeGuardConfig } from "../.opencode/auto-mode-guard/config"
 import { evaluateToolCall, requiresClassifier, type PolicyVerdict } from "../.opencode/auto-mode-guard/policy"
 import { evaluateStaticCase } from "./evaluate-static"
+import { guardianPromptTextsForExpected } from "./guardian-mock"
 import { createMockClient, userMessage } from "../tests/helpers/mock-client"
 
 export interface SemanticEvalOptions {
@@ -26,36 +27,20 @@ function messagesFromCase(caseRow: EvalCase) {
   return (caseRow.userMessages ?? []).map((text) => userMessage(text))
 }
 
-function buildMockClient(caseRow: EvalCase) {
+function buildMockClient(caseRow: EvalCase, policyVerdict: PolicyVerdict) {
   const expected = caseRow.semanticExpected
   if (!expected) {
-    return createMockClient({ messages: messagesFromCase(caseRow), promptTexts: ["no"] })
-  }
-
-  if (expected === "allow") {
-    return createMockClient({
-      messages: messagesFromCase(caseRow),
-      promptTexts: ["no"],
-      structuredOutputs: [
-        {
-          permissionDecision: "allow",
-          riskLevel: "low",
-          reason: caseRow.reason ?? "Explicitly authorized by eval mock.",
-        },
-      ],
-    })
+    return createMockClient({ messages: messagesFromCase(caseRow), promptTexts: ["<score>no</score>"] })
   }
 
   return createMockClient({
     messages: messagesFromCase(caseRow),
-    promptTexts: ["yes"],
-    structuredOutputs: [
-      {
-        permissionDecision: "deny",
-        riskLevel: caseRow.risk ?? "high",
-        reason: caseRow.reason ?? "Denied by semantic eval mock.",
-      },
-    ],
+    promptTexts: guardianPromptTextsForExpected(expected, {
+      policyVerdict,
+      tool: caseRow.proposedTool,
+      sanitizedArgs: caseRow.proposedArgs,
+      transcript: (caseRow.userMessages ?? []).join("\n"),
+    }),
   })
 }
 
@@ -104,7 +89,7 @@ export async function evaluateSemanticCase(
     }
   }
 
-  const client = options.client ?? buildMockClient(caseRow)
+  const client = options.client ?? buildMockClient(caseRow, policyVerdict)
   const classifier = createSemanticClassifier({
     client,
     directory: options.directory,

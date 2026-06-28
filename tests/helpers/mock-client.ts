@@ -3,14 +3,12 @@ import { vi } from "vitest"
 export interface MockClientOptions {
   messages?: unknown[]
   promptTexts?: string[]
-  structuredOutputs?: unknown[]
   sessionId?: string
 }
 
 export function createMockClient(options: MockClientOptions = {}) {
   const promptBodies: Array<Record<string, unknown>> = []
   let promptIndex = 0
-  const structuredQueue = [...(options.structuredOutputs ?? [])]
   const sessionId = options.sessionId ?? "classifier-session-test"
 
   const client = {
@@ -23,21 +21,7 @@ export function createMockClient(options: MockClientOptions = {}) {
           promptBodies.push(request.body)
         }
 
-        const hasStructuredFormat = Boolean(request.body?.format || request.body?.outputFormat)
-        if (hasStructuredFormat) {
-          const structured = structuredQueue.shift()
-          promptIndex += 1
-          if (structured) {
-            return {
-              data: {
-                info: { structured_output: structured },
-                parts: [],
-              },
-            }
-          }
-        }
-
-        const text = options.promptTexts?.[promptIndex] ?? "no"
+        const text = options.promptTexts?.[promptIndex] ?? "<score>no</score>"
         promptIndex += 1
 
         return {

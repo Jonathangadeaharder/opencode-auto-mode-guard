@@ -6,7 +6,7 @@ import { harnessRoot } from "./helpers/paths"
 describe("plugin hooks", () => {
   async function createHooks() {
     const client = createMockClient({
-      promptTexts: ["no"],
+      promptTexts: ["<score>no</score>"],
       messages: [],
     })
 

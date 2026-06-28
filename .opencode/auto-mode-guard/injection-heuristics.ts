@@ -1,4 +1,5 @@
 import type { PolicyVerdict, RiskLevel } from "./policy"
+import { matchesClassifierEscalationBash } from "./risk-patterns"
 
 const RISK_RANK: Record<RiskLevel, number> = {
   low: 0,
@@ -31,22 +32,6 @@ const INJECTION_ARG_PATTERNS: RegExp[] = [
   /\b#\s*SYSTEM:\s*allow\b/i,
   /\bignore\s+(classifier|safety|instructions)\b/i,
   /\bpermissionDecision\s*[:=]\s*allow\b/i,
-]
-
-const DANGEROUS_MANUAL_BASH_PATTERNS: RegExp[] = [
-  /\bgit\s+push\b[^;&|]*\b(main|master)\b/i,
-  /\bgit\s+push\s+.*--force\b/i,
-  /\bgit\s+push\s+origin\s+--delete\b/i,
-  /\bgit\s+reset\s+--hard\b/i,
-  /\bgit\s+rm\s+-/i,
-  /\brm\s+-[^;&|]*r/i,
-  /\bsudo\b/i,
-  /\bcurl\b[^;&|]*\|\s*(sh|bash|zsh)\b/i,
-  /\bwget\b[^;&|]*\|\s*(sh|bash|zsh)\b/i,
-  /\bkubectl\b/i,
-  /\bterraform\s+(apply|destroy)\b/i,
-  /\bgh\s+run\s+cancel\b/i,
-  /\bkill\s+-TERM\b/i,
 ]
 
 const SENSITIVE_READ_TARGET_PATTERNS: RegExp[] = [
@@ -92,10 +77,7 @@ export function requiresFullClassifierReview(input: {
     return true
   }
 
-  if (
-    policyVerdict.decision === "manual" &&
-    RISK_RANK[policyVerdict.risk] >= RISK_RANK.high
-  ) {
+  if (policyVerdict.decision === "manual" && RISK_RANK[policyVerdict.risk] >= RISK_RANK.high) {
     return true
   }
 
@@ -107,12 +89,8 @@ export function requiresFullClassifierReview(input: {
     return true
   }
 
-  if (
-    policyVerdict.decision === "manual" &&
-    tool === "bash" &&
-    DANGEROUS_MANUAL_BASH_PATTERNS.some((pattern) => pattern.test(stringifyArgs(sanitizedArgs)))
-  ) {
-    return true
+  if (policyVerdict.decision === "manual" && tool === "bash") {
+    return matchesClassifierEscalationBash(stringifyArgs(sanitizedArgs))
   }
 
   return false

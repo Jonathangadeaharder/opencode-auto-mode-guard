@@ -18,8 +18,6 @@ export interface EvalCase {
   blockCategory?: string
   /** How Claude blocked: classifier, runtime-block, or desktop-audit */
   blockMechanism?: "classifier" | "runtime-block" | "desktop-audit"
-  /** Reverse-engineered denial taxonomy slug for semantic benchmark */
-  blockCategory?: string
   blockCategoryLabel?: string
   /** Normalized denial reason (inferred for audit rows) */
   inferredDenialReason?: string
