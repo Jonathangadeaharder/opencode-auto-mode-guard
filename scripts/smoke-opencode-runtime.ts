@@ -74,14 +74,7 @@ async function run() {
 
   const classifierClient = createMockClient({
     messages: [userMessage("Run tests only.")],
-    promptTexts: ["yes"],
-    structuredOutputs: [
-      {
-        permissionDecision: "deny",
-        riskLevel: "high",
-        reason: "Git push was not explicitly requested.",
-      },
-    ],
+    promptTexts: ["<score>no</score>"],
   })
 
   const classifierHooks = await AutoModeGuard({

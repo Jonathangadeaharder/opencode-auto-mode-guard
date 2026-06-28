@@ -76,30 +76,43 @@ describe("config", () => {
     })
   })
 
-  it("resolves classifier stack with quick filter on small_model and full review on main model", async () => {
+  it("resolves classifier stack to Granite Guardian by default", async () => {
+    const root = await createTempDir(tempDirs)
+
+    const stack = await resolveClassifierStack(root, createTestConfig())
+    expect(stack?.quickFilter.source).toBe("granite_guardian_default")
+    expect(stack?.quickFilter.providerID).toBe("ollama")
+    expect(stack?.quickFilter.modelID).toBe("granite4.1-guardian:8b")
+    expect(stack?.fullReview.source).toBe("granite_guardian_default")
+    expect(stack?.fullReview.modelID).toBe("granite4.1-guardian:8b")
+  })
+
+  it("prefers opencode agent models only when explicitly configured for classifier tiers", async () => {
     const root = await createTempDir(tempDirs)
     await writeOpenCodeConfig(root, {
       small_model: "anthropic/claude-haiku-4-5",
       model: "anthropic/claude-sonnet-4-5",
     })
 
-    const stack = await resolveClassifierStack(root, createTestConfig())
-    expect(stack?.quickFilter.source).toBe("small_model")
+    const stack = await resolveClassifierStack(
+      root,
+      createTestConfig({
+        classifierQuickFilterModel: "anthropic/claude-haiku-4-5",
+        classifierFullReviewModel: "anthropic/claude-sonnet-4-5",
+      }),
+    )
+    expect(stack?.quickFilter.source).toBe("guard-quick-filter")
     expect(stack?.quickFilter.modelID).toBe("claude-haiku-4-5")
-    expect(stack?.fullReview.source).toBe("main_model")
+    expect(stack?.fullReview.source).toBe("guard-full-review")
     expect(stack?.fullReview.modelID).toBe("claude-sonnet-4-5")
   })
 
   it("resolveClassifierModel returns full-review tier", async () => {
     const root = await createTempDir(tempDirs)
-    await writeOpenCodeConfig(root, {
-      small_model: "anthropic/claude-haiku-4-5",
-      model: "anthropic/claude-sonnet-4-5",
-    })
 
     const resolved = await resolveClassifierModel(root, createTestConfig())
-    expect(resolved?.source).toBe("main_model")
-    expect(resolved?.modelID).toBe("claude-sonnet-4-5")
+    expect(resolved?.source).toBe("granite_guardian_default")
+    expect(resolved?.modelID).toBe("granite4.1-guardian:8b")
   })
 
   it("resolves full-review model with env override", async () => {
@@ -133,7 +146,7 @@ describe("config", () => {
     })
 
     const stack = await resolveClassifierStack(root, createTestConfig({ classifierModel: "openai/gpt-4.1-mini" }))
-    expect(stack?.quickFilter.source).toBe("small_model")
+    expect(stack?.quickFilter.source).toBe("granite_guardian_default")
     expect(stack?.fullReview.source).toBe("guard-config")
     expect(stack?.fullReview.modelID).toBe("gpt-4.1-mini")
   })

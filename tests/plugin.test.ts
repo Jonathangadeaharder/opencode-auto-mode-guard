@@ -51,14 +51,7 @@ describe("plugin hooks", () => {
   it("blocks manual bash through classifier deny with recovery guidance", async () => {
     const client = createMockClient({
       messages: [{ info: { role: "user" }, parts: [{ type: "text", text: "Run tests only." }] }],
-      promptTexts: ["yes"],
-      structuredOutputs: [
-        {
-          permissionDecision: "deny",
-          riskLevel: "high",
-          reason: "Git push was not explicitly requested.",
-        },
-      ],
+      promptTexts: ["<score>no</score>"],
     })
 
     const shell = vi.fn()

@@ -42,14 +42,7 @@ describe("opencode runtime smoke", () => {
     const classifierHooks = await AutoModeGuard({
       client: createMockClient({
         messages: [userMessage("Run tests only.")],
-        promptTexts: ["yes"],
-        structuredOutputs: [
-          {
-            permissionDecision: "deny",
-            riskLevel: "high",
-            reason: "Git push was not explicitly requested.",
-          },
-        ],
+        promptTexts: ["<score>no</score>"],
       }),
       $: shell,
       directory: harnessRoot,

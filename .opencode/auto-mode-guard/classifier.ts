@@ -1,5 +1,14 @@
 import type { PolicyVerdict, RiskLevel } from "./policy"
 import { requiresFullClassifierReview } from "./injection-heuristics"
+import {
+  authorizationScoreToDecision,
+  buildAuthorizationGuardianPrompt,
+  buildQuickFilterGuardianPrompt,
+  extractGuardianReasoning,
+  isGraniteGuardianModel,
+  parseGuardianScore,
+  quickFilterNeedsFullReview,
+} from "./granite-guardian"
 
 export type ClassifierDecision = "allow" | "deny"
 
@@ -196,24 +205,49 @@ export function createSemanticClassifier(options: SemanticClassifierOptions) {
           })
         }
 
-        const prompt = buildClassifierPrompt({
-          tool: input.tool,
-          policyVerdict: input.policyVerdict,
-          sanitizedArgs,
-          transcript,
-          directory: options.directory,
-          worktree: options.worktree,
-        })
+        const argsJson = truncate(safeJsonStringify(sanitizedArgs), MAX_ARGS_CHARS)
+        const useGuardian = isGraniteGuardianModel(fullReviewModel)
+        const prompt = useGuardian
+          ? buildAuthorizationGuardianPrompt({
+              tool: input.tool,
+              policyVerdict: input.policyVerdict,
+              sanitizedArgs,
+              transcript,
+              argsJson,
+              directory: options.directory,
+              worktree: options.worktree,
+              think:
+                input.policyVerdict.risk === "critical" ||
+                input.policyVerdict.risk === "high",
+            })
+          : buildClassifierPrompt({
+              tool: input.tool,
+              policyVerdict: input.policyVerdict,
+              sanitizedArgs,
+              transcript,
+              directory: options.directory,
+              worktree: options.worktree,
+            })
 
-        const raw = await runStructuredClassificationPrompt({
-          client: options.client,
-          classifierSessions,
-          prompt,
-          model: fullReviewModel,
-          directory: options.worktree ?? options.directory,
-        })
+        const raw = useGuardian
+          ? await runGuardianClassificationPrompt({
+              client: options.client,
+              classifierSessions,
+              prompt,
+              model: fullReviewModel,
+              directory: options.worktree ?? options.directory,
+            })
+          : await runStructuredClassificationPrompt({
+              client: options.client,
+              classifierSessions,
+              prompt,
+              model: fullReviewModel,
+              directory: options.worktree ?? options.directory,
+            })
         const verdict = {
-          ...normalizeClassifierVerdict(raw),
+          ...(useGuardian
+            ? normalizeGuardianVerdict(raw, input.policyVerdict)
+            : normalizeClassifierVerdict(raw)),
           stage: "full-review" as const,
         }
 
@@ -291,6 +325,33 @@ async function runQuickFilter(options: {
   sanitizedArgs: unknown
   transcript: string
 }): Promise<boolean> {
+  if (isGraniteGuardianModel(options.model)) {
+    const argsJson = truncate(safeJsonStringify(options.sanitizedArgs), MAX_ARGS_CHARS)
+    const prompt = buildQuickFilterGuardianPrompt({
+      tool: options.tool,
+      policyVerdict: options.policyVerdict,
+      sanitizedArgs: options.sanitizedArgs,
+      transcript: options.transcript,
+      argsJson,
+    })
+
+    const text = await runClassifierPromptText({
+      client: options.client,
+      classifierSessions: options.classifierSessions,
+      prompt,
+      model: options.model,
+      directory: options.directory,
+      system:
+        "You are IBM Granite Guardian in no-think scoring mode. Reply only with the required score tags. Do not call tools.",
+    })
+
+    const score = parseGuardianScore(text)
+    if (!score) {
+      return true
+    }
+    return quickFilterNeedsFullReview(score)
+  }
+
   const layer = options.policyVerdict.reviewLayer ?? "action"
   const prompt = `You are a fast security filter for an autonomous coding agent.
 
@@ -332,6 +393,24 @@ Reply with only yes or no.`
     return false
   }
   return true
+}
+
+async function runGuardianClassificationPrompt(options: {
+  client: any
+  classifierSessions: Set<string>
+  prompt: string
+  model?: { providerID: string; modelID: string }
+  directory: string
+}): Promise<string> {
+  return runClassifierPromptText({
+    client: options.client,
+    classifierSessions: options.classifierSessions,
+    prompt: options.prompt,
+    model: options.model,
+    directory: options.directory,
+    system:
+      "You are IBM Granite Guardian judging whether a proposed agent tool call is authorized. Reply only with the required thinking and score tags. Do not call tools.",
+  })
 }
 
 async function runStructuredClassificationPrompt(options: {
@@ -575,6 +654,47 @@ Proposed tool call:
 ${argsJson}
 
 Return only the structured JSON object that matches the requested schema.`
+}
+
+function normalizeGuardianVerdict(
+  raw: string,
+  policyVerdict: PolicyVerdict,
+): SemanticClassifierVerdict {
+  const score = parseGuardianScore(raw)
+  if (!score) {
+    return deny(
+      policyVerdict.risk === "low" ? "high" : policyVerdict.risk,
+      "Granite Guardian returned an unparseable score; failing closed.",
+    )
+  }
+
+  const permissionDecision = authorizationScoreToDecision(score)
+  const reasoning = truncate(redactSecretsInText(extractGuardianReasoning(raw)), 1200)
+  const fallbackReason =
+    permissionDecision === "allow"
+      ? "Granite Guardian authorized this action against explicit user intent."
+      : "Granite Guardian denied: the action is not explicitly authorized by user messages."
+
+  if (permissionDecision === "allow") {
+    return {
+      permissionDecision: "allow",
+      riskLevel: "low",
+      reason: reasoning || fallbackReason,
+      confidence: 0.85,
+    }
+  }
+
+  const riskLevel: RiskLevel =
+    policyVerdict.risk === "low" || policyVerdict.risk === "medium" ? "high" : policyVerdict.risk
+
+  return {
+    permissionDecision: "deny",
+    riskLevel,
+    reason: reasoning || fallbackReason,
+    requiredUserClarification:
+      "Ask the user for explicit, concrete permission for this exact tool action.",
+    confidence: 0.9,
+  }
 }
 
 function normalizeClassifierVerdict(raw: unknown): SemanticClassifierVerdict {

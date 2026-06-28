@@ -506,6 +506,42 @@ describe("classifier contract", () => {
     expect(client.session.prompt).toHaveBeenCalledTimes(1)
   })
 
+  it("uses granite guardian score tags for full review when configured", async () => {
+    const client = createMockClient({
+      messages: [userMessage("Refactor auth only.")],
+      promptTexts: ["<score>yes</score>", "<score>no</score>"],
+    })
+
+    const classifier = createSemanticClassifier({
+      client,
+      directory: harnessRoot,
+      worktree: harnessRoot,
+      models: {
+        quickFilter: { providerID: "ollama", modelID: "granite4.1-guardian:8b" },
+        fullReview: { providerID: "ollama", modelID: "granite4.1-guardian:8b" },
+      },
+    })
+
+    const verdict = await classifier.classify({
+      sessionID: "user-session-granite",
+      tool: "bash",
+      args: { command: "git push upstream feature/test" },
+      policyVerdict: {
+        decision: "manual",
+        risk: "medium",
+        mutates: true,
+        reason: "Untrusted push",
+        reviewLayer: "action",
+      },
+    })
+
+    expect(verdict.permissionDecision).toBe("deny")
+    expect(verdict.stage).toBe("full-review")
+    const fullReviewPrompt = (client.promptBodies[1]?.parts as Array<{ text?: string }> | undefined)?.[0]?.text ?? ""
+    expect(fullReviewPrompt).toContain("<guardian>")
+    expect(client.session.prompt).toHaveBeenCalledTimes(2)
+  })
+
   it("disables workspace tools in classifier session prompts", async () => {
     const client = createMockClient({
       messages: [userMessage("Run tests.")],

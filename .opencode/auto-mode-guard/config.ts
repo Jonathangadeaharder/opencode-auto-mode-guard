@@ -1,5 +1,8 @@
 import { promises as fs } from "node:fs"
 import * as path from "node:path"
+import { DEFAULT_GRANITE_GUARDIAN_MODEL } from "./granite-guardian"
+
+export { DEFAULT_GRANITE_GUARDIAN_MODEL } from "./granite-guardian"
 
 export interface EnvironmentTrust {
   gitRemotes: string[]
@@ -17,9 +20,9 @@ export interface AutoModeGuardConfig {
     totalBlocks: number
   }
   classifierModel?: string
-  /** Fast yes/no filter model (defaults to OpenCode small_model). */
+  /** Fast yes/no filter model (defaults to local Granite Guardian via Ollama). */
   classifierQuickFilterModel?: string
-  /** Deep semantic review model (defaults to OpenCode model / main). */
+  /** Deep semantic review model (defaults to local Granite Guardian via Ollama). */
   classifierFullReviewModel?: string
 }
 
@@ -33,6 +36,7 @@ export interface ResolvedClassifierModel {
     | "guard-quick-filter"
     | "guard-full-review"
     | "guard-config"
+    | "granite_guardian_default"
     | "small_model"
     | "main_model"
 }
@@ -138,6 +142,11 @@ function resolveQuickFilterModel(
     return { ...guardModel, source: "guard-quick-filter" }
   }
 
+  const graniteDefault = parseModelRef(DEFAULT_GRANITE_GUARDIAN_MODEL)
+  if (graniteDefault) {
+    return { ...graniteDefault, source: "granite_guardian_default" }
+  }
+
   const smallModel = parseModelRef(readString(opencode.small_model))
   if (smallModel) {
     return { ...smallModel, source: "small_model" }
@@ -173,6 +182,11 @@ function resolveFullReviewModel(
   const guardLegacy = parseModelRef(guardConfig.classifierModel)
   if (guardLegacy) {
     return { ...guardLegacy, source: "guard-config" }
+  }
+
+  const graniteDefault = parseModelRef(DEFAULT_GRANITE_GUARDIAN_MODEL)
+  if (graniteDefault) {
+    return { ...graniteDefault, source: "granite_guardian_default" }
   }
 
   const mainModel = parseModelRef(readString(opencode.model))

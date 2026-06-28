@@ -85,12 +85,14 @@ Most tool calls never reach the LLM: static policy `allow`/`deny` handles them. 
 
 | Stage | Model | When |
 |-------|-------|------|
-| **Quick filter** | OpenCode `small_model` (or `classifierQuickFilterModel`) | Medium/low `manual` only — fast yes/no |
-| **Full review** | OpenCode `model` / default (or `classifierFullReviewModel`) | High/critical risk, injection heuristics, or quick filter says yes |
+| **Quick filter** | [Granite Guardian 4.1](https://www.ibm.com/granite/docs/models/guardian) via Ollama (`ollama/granite4.1-guardian:8b`) — no-think `<score>` | Medium/low `manual` only |
+| **Full review** | Same Granite Guardian — think mode for high/critical, BYOC authorization criteria | High/critical risk, injection heuristics, or quick filter says yes |
 
-High/critical policy risk **skips** the quick filter entirely (no small model on those paths).
+Default: `ollama pull granite4.1-guardian:8b` (local). Classifier does **not** use the agent's OpenCode `model` / `small_model` unless you override.
 
-Env overrides: `OPENCODE_AUTO_MODE_QUICK_FILTER_MODEL`, `OPENCODE_AUTO_MODE_FULL_REVIEW_MODEL`, legacy `OPENCODE_AUTO_MODE_CLASSIFIER_MODEL` → full review only.
+High/critical policy risk **skips** the quick filter entirely.
+
+Env overrides: `OPENCODE_AUTO_MODE_QUICK_FILTER_MODEL`, `OPENCODE_AUTO_MODE_FULL_REVIEW_MODEL`, legacy `OPENCODE_AUTO_MODE_CLASSIFIER_MODEL` → full review only. Guard config: `classifierQuickFilterModel`, `classifierFullReviewModel`.
 
 ### Policy gaps closed
 
